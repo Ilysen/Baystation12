@@ -152,7 +152,9 @@
 		cooking.Cut()
 		var/index = source.len
 		while (index)
-			cooking += cook_item(source[index])
+			var/list/cooked = cook_item(source[index])
+			for (var/cooked_item in cooked)
+				cooking += cooked_item
 			--index
 		QDEL_NULL_LIST(source)
 		audible_message(SPAN_ITALIC("\The [src] lets out a happy ding."))
@@ -182,16 +184,20 @@
 		return S
 	if (LAZYISIN(S.cooked_with, cook_mode) || length(S.cooked_with) > MAX_FOOD_COOK_COUNT)
 		return new /obj/item/weapon/reagent_containers/food/snacks/badrecipe(src)
-	var/obj/item/weapon/reagent_containers/food/snacks/result = cook_modes[cook_mode]["type"]
-	result = new result(src)
-	if (S.reagents && S.reagents.total_volume)
-		S.reagents.trans_to(result, S.reagents.total_volume)
-	var/flags = cook_modes[cook_mode]["flags"] || 0
-	modify_result_appearance(result, S, flags)
-	modify_result_text(result, S, flags)
-	result.cooked_with = S.cooked_with?.Copy()
-	LAZYADD(result.cooked_with, cook_mode)
-	return result
+	. = list()
+	var/result_amt = cook_modes[cook_mode]["amount"] ? cook_modes[cook_mode]["amount"] : 1
+	var/reagents_per_item = S.reagents.total_volume / result_amt
+	for (var/i = 1; i <= result_amt; i++)
+		var/obj/item/weapon/reagent_containers/food/snacks/result = cook_modes[cook_mode]["type"]
+		result = new result(src)
+		if (S.reagents && S.reagents.total_volume)
+			S.reagents.trans_to_obj(result, reagents_per_item)
+		var/flags = cook_modes[cook_mode]["flags"] || 0
+		modify_result_appearance(result, S, flags)
+		modify_result_text(result, S, flags)
+		result.cooked_with = S.cooked_with?.Copy()
+		LAZYADD(result.cooked_with, cook_mode)
+		. += result
 
 /obj/machinery/cooker/proc/modify_result_text(obj/item/weapon/reagent_containers/food/snacks/result, obj/item/weapon/reagent_containers/food/snacks/source, flags)
 	var/prefix = cook_modes[cook_mode]["prefix"]
@@ -384,6 +390,13 @@
 			"suffix" = "donut",
 			"desc" = "made into a donut",
 			"flags" = COOKER_STRIP_RAW
+		),
+		"Nuggets" = list(
+			"type" = /obj/item/weapon/reagent_containers/food/snacks/variable/nugget,
+			"suffix" = "nugget",
+			"desc" = "made into nuggets",
+			"flags" = COOKER_STRIP_RAW,
+			"amount" = 5
 		)
 	)
 
@@ -481,6 +494,16 @@
 	name = "filled donut"
 	desc = "Donut eat this!"
 	icon_state = "donut"
+
+
+/obj/item/weapon/reagent_containers/food/snacks/variable/nugget
+	name = "nugget"
+	desc = "The food of the gods."
+	icon_state = "donut"
+
+/obj/item/weapon/reagent_containers/food/snacks/variable/nugget/Initialize()
+	. = ..()
+	bitesize = reagents.maximum_volume // one nugget one chomp
 
 
 /obj/item/weapon/reagent_containers/food/snacks/variable/jawbreaker
